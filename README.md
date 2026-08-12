@@ -35,11 +35,6 @@ brew install --cask arielmendz/kuati/kuati
 open /Applications/Kuati.app
 ```
 
-For a private repository, tap it over SSH with `brew tap arielmendz/kuati
-git@github.com:arielmendz/kuati.git`. The release download also needs an
-authenticated hosting strategy; Homebrew does not inherit Git's SSH credentials
-when downloading Cask archives.
-
 After opening Kuati, grant it access in **System Settings → Privacy & Security →
 Accessibility**. Releases are currently ad-hoc signed, so macOS may require
 Accessibility access to be enabled again after an upgrade.
@@ -87,9 +82,22 @@ Releases are built as universal Apple Silicon and Intel applications. Update the
 version in `support/Info.plist`, commit it, and push a matching tag:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 The release workflow tests the project, publishes `Kuati-<version>.zip`, and
 updates the version and SHA-256 in `Casks/kuati.rb`.
+
+## License
+
+Copyright © 2026 Ariel Mendez.
+
+Kuati—including its source code, documentation, and project-owned icons and
+assets—is licensed under the [GNU General Public License v3.0 only](LICENSE).
+You may use, study, modify, distribute, and sell Kuati. If you distribute a
+modified version or derivative work, you must make its corresponding source
+available to its recipients under the same GPLv3 terms. Changes used only
+privately or within an organization do not have to be published.
+
+Contributions to this repository are accepted under `GPL-3.0-only`.

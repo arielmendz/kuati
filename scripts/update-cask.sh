@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Ariel Mendez
+# SPDX-License-Identifier: GPL-3.0-only
+
 set -eu
 
 version="${1:-}"

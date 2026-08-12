@@ -1,4 +1,6 @@
 // swift-tools-version: 5.10
+// SPDX-FileCopyrightText: 2026 Ariel Mendez
+// SPDX-License-Identifier: GPL-3.0-only
 
 import PackageDescription
 

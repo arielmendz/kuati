@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ariel Mendez
+# SPDX-License-Identifier: GPL-3.0-only
+
 cask "kuati" do
   version "0.1.0"
   sha256 "dd6f2d0b1488a0266227163d10bf59e81027892f354e5a371574536c512f6a34"
@@ -15,5 +18,6 @@ cask "kuati" do
 
   caveats do
     unsigned_accessibility
+    free_license "https://github.com/arielmendz/kuati/blob/main/LICENSE"
   end
 end

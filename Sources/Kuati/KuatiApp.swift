@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ariel Mendez
+// SPDX-License-Identifier: GPL-3.0-only
+
 import SwiftUI
 
 @main
@@ -28,9 +31,8 @@ struct KuatiApp: App {
                 NSApplication.shared.orderFrontStandardAboutPanel(
                     options: [
                         .applicationName: "Kuati",
-                        .applicationVersion: "0.1.0",
                         .credits: NSAttributedString(
-                            string: "A small, automatic cascading window manager for macOS."
+                            string: "A small, automatic cascading window manager for macOS.\n\nLicensed under GNU GPLv3."
                         )
                     ]
                 )

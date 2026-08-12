@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Ariel Mendez
+# SPDX-License-Identifier: GPL-3.0-only
+
 set -eu
 
 version="${1:-}"
@@ -55,6 +58,7 @@ mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 lipo -create "$arm_bin/Kuati" "$intel_bin/Kuati" -output "$app_dir/Contents/MacOS/Kuati"
 cp "$root_dir/support/Info.plist" "$app_dir/Contents/Info.plist"
 cp "$root_dir/support/Kuati.icns" "$app_dir/Contents/Resources/Kuati.icns"
+cp "$root_dir/LICENSE" "$app_dir/Contents/Resources/LICENSE"
 codesign --force --deep --sign - "$app_dir"
 
 dist_dir="$root_dir/dist"
