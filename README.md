@@ -6,6 +6,7 @@ multiple windows in an overlapping diagonal cascade at 90% of maximized size.
 
 ## First version
 
+- Uses a compact native macOS menu with standard clickable items
 - Cascades the visible, movable windows on every display
 - Maximizes a window when it is the only one in its workspace
 - Keeps every window at 90% of maximized size when two or more are present
