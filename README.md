@@ -26,13 +26,19 @@ multiple windows in an overlapping diagonal cascade at 90% of maximized size.
 
 ## Install with Homebrew
 
-Kuati is distributed as a Homebrew Cask from this repository:
+Kuati is distributed as a Homebrew Cask from this repository. The repository
+and its GitHub release assets must be public for this unauthenticated install:
 
 ```sh
 brew tap arielmendz/kuati https://github.com/arielmendz/kuati.git
 brew install --cask arielmendz/kuati/kuati
 open /Applications/Kuati.app
 ```
+
+For a private repository, tap it over SSH with `brew tap arielmendz/kuati
+git@github.com:arielmendz/kuati.git`. The release download also needs an
+authenticated hosting strategy; Homebrew does not inherit Git's SSH credentials
+when downloading Cask archives.
 
 After opening Kuati, grant it access in **System Settings → Privacy & Security →
 Accessibility**. Releases are currently ad-hoc signed, so macOS may require
