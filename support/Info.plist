@@ -8,6 +8,8 @@
     <string>Kuati</string>
     <key>CFBundleIdentifier</key>
     <string>dev.arielmendez.kuati</string>
+    <key>CFBundleIconFile</key>
+    <string>Kuati</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
