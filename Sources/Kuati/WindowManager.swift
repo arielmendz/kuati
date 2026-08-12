@@ -10,7 +10,7 @@ import KuatiCore
 final class WindowManager: ObservableObject {
     @Published private(set) var hasAccessibilityPermission = false
     @Published private(set) var statusText = "Checking permissions…"
-    @Published var isAutomatic: Bool = WindowManager.storedAutomaticPreference {
+    @Published var isAutomatic: Bool {
         didSet {
             UserDefaults.standard.set(isAutomatic, forKey: Self.automaticDefaultsKey)
             if isAutomatic {
@@ -33,16 +33,6 @@ final class WindowManager: ObservableObject {
     /// fraction of a second, long before this fires.
     private static let reconciliationInterval: TimeInterval = 30
 
-    /// Reads the saved preference without routing through `isAutomatic`.
-    /// `@Published` properties run their `didSet` even when assigned inside
-    /// `init`, so restoring the value there would arrange windows — and so
-    /// prompt for Accessibility access — before `refreshPermission()` had run.
-    private static var storedAutomaticPreference: Bool {
-        let defaults = UserDefaults.standard
-        guard defaults.object(forKey: automaticDefaultsKey) != nil else { return true }
-        return defaults.bool(forKey: automaticDefaultsKey)
-    }
-
     private var permissionTimer: Timer?
     private var reconciliationTimer: Timer?
     private var settlingTimer: Timer?
@@ -52,6 +42,25 @@ final class WindowManager: ObservableObject {
     private var previousWindowSignature = ""
 
     init() {
+        // Restore the preference by assigning the property wrapper directly. A
+        // plain assignment would run `didSet` — @Published observers fire even
+        // inside `init` — which would arrange windows before the permission
+        // check and ask for Accessibility access on every launch.
+        let defaults = UserDefaults.standard
+        let automatic = defaults.object(forKey: Self.automaticDefaultsKey) != nil
+            ? defaults.bool(forKey: Self.automaticDefaultsKey)
+            : true
+        _isAutomatic = Published(initialValue: automatic)
+
+        // Nothing else belongs here. This runs while SwiftUI is building the
+        // scene, so anything that stalls costs the app its menu bar item
+        // entirely — the app stays running with no way to reach it.
+        DispatchQueue.main.async { [weak self] in
+            self?.start()
+        }
+    }
+
+    private func start() {
         // Bound how long an unresponsive application can block the main thread
         // inside a synchronous accessibility call. Applying this to the
         // system-wide element sets the default for every element this process
