@@ -43,7 +43,11 @@ struct KuatiApp: App {
             }
             .keyboardShortcut("q")
         } label: {
-            Image(systemName: "rectangle.3.group")
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(width: 18, height: 18)
                 .accessibilityLabel("Kuati")
         }
         .menuBarExtraStyle(.menu)
