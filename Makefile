@@ -3,6 +3,8 @@
 
 .PHONY: build test app release install clean
 
+APPDIR ?= /Applications
+
 build:
 	swift build
 
@@ -16,7 +18,8 @@ release:
 	./scripts/build-release.sh $${VERSION:?Run make release VERSION=0.1.3}
 
 install: app
-	ditto build/Kuati.app /Applications/Kuati.app
+	mkdir -p "$(APPDIR)"
+	ditto build/Kuati.app "$(APPDIR)/Kuati.app"
 
 clean:
 	swift package clean

@@ -28,8 +28,9 @@ their maximized size; three or more use 90%.
 
 ## Install with Homebrew
 
-Kuati is distributed as a Homebrew Cask from this repository. The repository
-and its GitHub release assets must be public for this unauthenticated install:
+Kuati is distributed from this repository as a Homebrew Cask.
+
+### Standard installation
 
 ```sh
 brew tap arielmendz/kuati https://github.com/arielmendz/kuati.git
@@ -37,15 +38,69 @@ brew install --cask arielmendz/kuati/kuati
 open /Applications/Kuati.app
 ```
 
-After opening Kuati, grant it access in **System Settings → Privacy & Security →
-Accessibility**. Releases are currently ad-hoc signed, so macOS may require
-Accessibility access to be enabled again after an upgrade.
+### Installation without administrator access
 
-Upgrade or uninstall with:
+Install the app in your user Applications directory when you cannot write to
+`/Applications`:
 
 ```sh
+mkdir -p "$HOME/Applications"
+brew tap arielmendz/kuati https://github.com/arielmendz/kuati.git
+brew install --cask --appdir="$HOME/Applications" arielmendz/kuati/kuati
+open "$HOME/Applications/Kuati.app"
+```
+
+Use `$HOME/Applications`, not `~/Applications`, as the value of Homebrew's
+[`--appdir`](https://docs.brew.sh/Manpage.html#global-cask-options) option. Some
+shells preserve the tilde literally when it appears after `=`.
+
+If Kuati was previously installed in another location, move the Homebrew-managed
+installation with:
+
+```sh
+brew reinstall --cask --appdir="$HOME/Applications" kuati
+```
+
+### First launch
+
+> [!IMPORTANT]
+> Current releases are ad-hoc signed and are not notarized by Apple. Gatekeeper
+> may block them even though Homebrew verifies the archive checksum. Do not
+> disable Gatekeeper globally. A normal, warning-free installation requires a
+> [Developer ID-signed and notarized](https://developer.apple.com/support/developer-id/)
+> Kuati release.
+
+When Kuati opens, its two-window icon appears in the menu bar. Complete the
+one-time setup:
+
+1. Select **Grant Accessibility Access** from the Kuati menu.
+2. In **System Settings → Privacy & Security → Accessibility**, enable the exact
+   Kuati copy you installed.
+3. Return to Kuati and select **Check Accessibility Access**.
+4. Optionally enable **Start at Login**. If macOS asks for approval, enable Kuati
+   under **System Settings → General → Login Items**.
+
+Because current releases use an ad-hoc signature, macOS may require Accessibility
+access to be granted again after an upgrade. Developer ID signing will also fix
+this upgrade experience by giving releases a stable signing identity.
+
+### Upgrade and uninstall
+
+Homebrew remembers the application directory used for the original install:
+
+```sh
+brew update
 brew upgrade --cask kuati
 brew uninstall --cask kuati
+```
+
+Disable **Start at Login** from the Kuati menu before uninstalling so macOS can
+unregister the login item cleanly.
+
+To also remove Kuati's saved preferences:
+
+```sh
+brew uninstall --cask --zap kuati
 ```
 
 ## Build and run
@@ -68,6 +123,12 @@ To copy it into Applications:
 
 ```sh
 make install
+```
+
+For a non-administrator user:
+
+```sh
+make install APPDIR="$HOME/Applications"
 ```
 
 The app is ad-hoc signed for local use. A distributable release can later replace
@@ -94,6 +155,13 @@ git push origin v0.1.3
 
 The release workflow tests the project, publishes `Kuati-<version>.zip`, and
 updates the version and SHA-256 in `Casks/kuati.rb`.
+
+Before Homebrew installation can provide a polished first-run experience, the
+release workflow must sign Kuati with a stable Developer ID Application
+certificate, enable the hardened runtime, submit the archive to Apple's notary
+service, and staple the resulting ticket. After that is configured, verify each
+release with `spctl` and remove the unsigned-release caveats from the Cask and
+this README.
 
 ## License
 

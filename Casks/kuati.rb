@@ -14,10 +14,18 @@ cask "kuati" do
 
   app "Kuati.app"
 
+  uninstall quit: "dev.arielmendez.kuati"
+
   zap trash: "~/Library/Preferences/dev.arielmendez.kuati.plist"
 
   caveats do
     unsigned_accessibility
     free_license "https://github.com/arielmendz/kuati/blob/main/LICENSE"
   end
+  caveats <<~EOS
+    Kuati is currently ad-hoc signed and not notarized by Apple. Gatekeeper may
+    block it from opening. Do not disable Gatekeeper globally. See the first-run
+    instructions at:
+      https://github.com/arielmendz/kuati#first-launch
+  EOS
 end
