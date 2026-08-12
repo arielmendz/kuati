@@ -20,19 +20,26 @@ private func testProducesOneFramePerWindowInsideWorkspace() {
         require(frames.count == count, "Expected \(count) frames, got \(frames.count)")
         for frame in frames {
             require(workspace.contains(frame), "\(frame) is outside \(workspace)")
-            if count == 1 {
-                require(frame == workspace, "A single window must fill the workspace")
-                continue
-            }
-            require(
-                frame.width == floor(workspace.width * 0.9),
-                "Frame is not 90% of the workspace width: \(frame)"
-            )
-            require(
-                frame.height == floor(workspace.height * 0.9),
-                "Frame is not 90% of the workspace height: \(frame)"
-            )
         }
+    }
+}
+
+private func testSingleWindowFillsWorkspace() {
+    require(
+        LayoutPlanner.frames(in: workspace, count: 1) == [workspace],
+        "A single window must fill the workspace"
+    )
+}
+
+private func testTwoWindowsUse95PercentOfWorkspace() {
+    let frames = LayoutPlanner.frames(in: workspace, count: 2)
+    let expectedSize = CGSize(
+        width: floor(workspace.width * 0.95),
+        height: floor(workspace.height * 0.95)
+    )
+
+    for frame in frames {
+        require(frame.size == expectedSize, "Two windows must use 95% of the workspace: \(frame)")
     }
 }
 
@@ -59,15 +66,18 @@ private func testWindowsCascadeFromUpperLeftToLowerRight() {
     }
 }
 
-private func testEveryWindowKeepsTheSameSizeAsCountGrows() {
-    let reference = LayoutPlanner.frames(in: workspace, count: 2)[0].size
+private func testThreeOrMoreWindowsUse90PercentOfWorkspace() {
+    let expectedSize = CGSize(
+        width: floor(workspace.width * 0.9),
+        height: floor(workspace.height * 0.9)
+    )
 
     for count in 3...20 {
         let frames = LayoutPlanner.frames(in: workspace, count: count)
         for frame in frames {
             require(
-                frame.size == reference,
-                "Window size changed when the cascade grew to \(count) windows"
+                frame.size == expectedSize,
+                "\(count) windows must use 90% of the workspace: \(frame)"
             )
         }
     }
@@ -100,8 +110,10 @@ private func testEdgeCases() {
 }
 
 testProducesOneFramePerWindowInsideWorkspace()
+testSingleWindowFillsWorkspace()
+testTwoWindowsUse95PercentOfWorkspace()
 testWindowsCascadeFromUpperLeftToLowerRight()
-testEveryWindowKeepsTheSameSizeAsCountGrows()
+testThreeOrMoreWindowsUse90PercentOfWorkspace()
 testAnimationInterpolation()
 testEdgeCases()
 print("All Kuati layout tests passed")

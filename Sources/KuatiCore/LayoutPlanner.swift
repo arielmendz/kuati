@@ -4,15 +4,17 @@
 import CoreGraphics
 
 public enum LayoutPlanner {
-    public static let windowScale: CGFloat = 0.9
+    private static let twoWindowScale: CGFloat = 0.95
+    private static let multiWindowScale: CGFloat = 0.9
 
     /// Maximizes a single window. With multiple windows, produces equal-size
-    /// frames that cascade diagonally across `workspace`. Each cascaded frame is
-    /// 90% of the usable maximized size.
+    /// frames that cascade diagonally across `workspace`. Two windows use 95%
+    /// of the usable maximized size; three or more use 90%.
     public static func frames(in workspace: CGRect, count: Int) -> [CGRect] {
         guard count > 0, workspace.width > 0, workspace.height > 0 else { return [] }
         guard count > 1 else { return [workspace] }
 
+        let windowScale = count == 2 ? twoWindowScale : multiWindowScale
         let windowSize = CGSize(
             width: floor(workspace.width * windowScale),
             height: floor(workspace.height * windowScale)

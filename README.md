@@ -2,7 +2,8 @@
 
 Kuati is a tiny macOS menu-bar window manager. It watches the visible windows in
 your current workspace, maximizes a window when it is alone, and distributes
-multiple windows in an overlapping diagonal cascade at 90% of maximized size.
+multiple windows in an overlapping diagonal cascade. Two windows use 95% of
+their maximized size; three or more use 90%.
 
 ## First version
 
@@ -10,7 +11,7 @@ multiple windows in an overlapping diagonal cascade at 90% of maximized size.
 - Includes a custom two-window Kuati application icon
 - Cascades the visible, movable windows on every display
 - Maximizes a window when it is the only one in its workspace
-- Keeps every window at 90% of maximized size when two or more are present
+- Keeps two windows at 95% and three or more at 90% of maximized size
 - Animates window movement and resizing with a short eased transition
 - Re-cascades automatically when windows are opened, closed, or moved between displays
 - Can launch automatically when you log in to macOS
@@ -87,8 +88,8 @@ Releases are built as universal Apple Silicon and Intel applications. Update the
 version in `support/Info.plist`, commit it, and push a matching tag:
 
 ```sh
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 The release workflow tests the project, publishes `Kuati-<version>.zip`, and

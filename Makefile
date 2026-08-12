@@ -13,7 +13,7 @@ app:
 	./scripts/build-app.sh release
 
 release:
-	./scripts/build-release.sh $${VERSION:?Run make release VERSION=0.1.2}
+	./scripts/build-release.sh $${VERSION:?Run make release VERSION=0.1.3}
 
 install: app
 	ditto build/Kuati.app /Applications/Kuati.app
