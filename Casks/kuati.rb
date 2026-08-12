@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 cask "kuati" do
-  version "0.1.1"
-  sha256 "3c99ef1801134f0a785fc847a11b976062e7215eeb07248b4159157be523eaa0"
+  version "0.1.2"
+  sha256 "f0d1a4749adc8f5d322af2f4f5bbfd3f10f39dc23053239595a1415c5d22d4c6"
 
   url "https://github.com/arielmendz/kuati/releases/download/v#{version}/Kuati-#{version}.zip"
   name "Kuati"
