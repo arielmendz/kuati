@@ -5,7 +5,9 @@ import SwiftUI
 
 @main
 struct KuatiApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var windowManager = WindowManager()
+    @StateObject private var loginItemManager = LoginItemManager()
 
     var body: some Scene {
         MenuBarExtra {
@@ -24,6 +26,16 @@ struct KuatiApp: App {
                     windowManager.refreshPermission()
                 }
             }
+
+            Divider()
+
+            Toggle(
+                "Start at Login",
+                isOn: Binding(
+                    get: { loginItemManager.isEnabled },
+                    set: { loginItemManager.setEnabled($0) }
+                )
+            )
 
             Divider()
 
@@ -47,6 +59,11 @@ struct KuatiApp: App {
         } label: {
             Image(nsImage: MenuBarIcon.image)
                 .accessibilityLabel("Kuati")
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                loginItemManager.refresh()
+            }
         }
         .menuBarExtraStyle(.menu)
     }

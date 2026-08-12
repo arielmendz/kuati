@@ -13,6 +13,7 @@ multiple windows in an overlapping diagonal cascade at 90% of maximized size.
 - Keeps every window at 90% of maximized size when two or more are present
 - Animates window movement and resizing with a short eased transition
 - Re-cascades automatically when windows are opened, closed, or moved between displays
+- Can launch automatically when you log in to macOS
 - Keeps the menu bar and Dock clear by using each display's visible workspace
 - Lets you trigger the cascade manually
 - Ignores minimized, full-screen, hidden, and non-resizable windows
@@ -58,6 +59,10 @@ Kuati appears in the menu bar. On first launch, select **Grant Accessibility
 Access**, enable Kuati in **System Settings → Privacy & Security → Accessibility**,
 then return to Kuati and select **Check Again**.
 
+Select **Start at Login** in the Kuati menu to have macOS launch the app on
+subsequent logins. If macOS requires approval, Kuati opens **System Settings →
+General → Login Items** so you can enable it there.
+
 To copy it into Applications:
 
 ```sh
@@ -82,8 +87,8 @@ Releases are built as universal Apple Silicon and Intel applications. Update the
 version in `support/Info.plist`, commit it, and push a matching tag:
 
 ```sh
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 The release workflow tests the project, publishes `Kuati-<version>.zip`, and
