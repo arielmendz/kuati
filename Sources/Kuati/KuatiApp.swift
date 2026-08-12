@@ -47,7 +47,7 @@ private struct MenuContent: View {
 
                 Toggle("Arrange automatically", isOn: $windowManager.isAutomatic)
 
-                Label("Windows use 90% of the workspace", systemImage: "arrow.up.left.and.arrow.down.right")
+                Label("1 fills the workspace; 2+ cascade at 90%", systemImage: "arrow.up.left.and.arrow.down.right")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {

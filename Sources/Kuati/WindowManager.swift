@@ -15,8 +15,11 @@ final class WindowManager: ObservableObject {
     }
 
     private static let automaticDefaultsKey = "automaticArrangement"
+    private static let animationSteps = 16
+    private static let animationFrameNanoseconds: UInt64 = 16_666_667
 
     private var timer: Timer?
+    private var animationTask: Task<Void, Never>?
     private var previousWindowSignature = ""
 
     init() {
@@ -80,6 +83,7 @@ final class WindowManager: ObservableObject {
 
     private func arrange(_ windows: [ManagedWindow]) {
         let screens = ScreenGeometry.currentScreens()
+        var transitions: [ManagedWindowTransition] = []
 
         for screen in screens {
             let screenWindows = windows
@@ -90,9 +94,42 @@ final class WindowManager: ObservableObject {
                 count: screenWindows.count
             )
 
-            for (window, frame) in zip(screenWindows, targetFrames) {
-                window.set(frame: frame)
+            transitions.append(contentsOf: zip(screenWindows, targetFrames).map {
+                ManagedWindowTransition(window: $0.0, targetFrame: $0.1)
+            })
+        }
+
+        animate(transitions)
+    }
+
+    private func animate(_ transitions: [ManagedWindowTransition]) {
+        animationTask?.cancel()
+        guard !transitions.isEmpty else { return }
+
+        animationTask = Task { @MainActor [weak self] in
+            for step in 1...Self.animationSteps {
+                guard !Task.isCancelled else { return }
+                let progress = CGFloat(step) / CGFloat(Self.animationSteps)
+
+                for transition in transitions {
+                    transition.window.set(
+                        frame: FrameInterpolator.easeOut(
+                            from: transition.window.frame,
+                            to: transition.targetFrame,
+                            progress: progress
+                        )
+                    )
+                }
+
+                guard step < Self.animationSteps else { continue }
+                do {
+                    try await Task.sleep(nanoseconds: Self.animationFrameNanoseconds)
+                } catch {
+                    return
+                }
             }
+
+            self?.animationTask = nil
         }
     }
 
@@ -128,11 +165,16 @@ final class WindowManager: ObservableObject {
             return
         }
         if let windowCount {
-            statusText = windowCount == 1 ? "1 window arranged" : "\(windowCount) windows arranged"
+            statusText = windowCount == 1 ? "1 window maximized" : "\(windowCount) windows cascaded"
         } else {
             statusText = isAutomatic ? "Watching this workspace" : "Ready"
         }
     }
+}
+
+private struct ManagedWindowTransition {
+    let window: ManagedWindow
+    let targetFrame: CGRect
 }
 
 private struct ManagedWindow {

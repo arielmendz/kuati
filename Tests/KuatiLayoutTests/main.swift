@@ -17,6 +17,10 @@ private func testProducesOneFramePerWindowInsideWorkspace() {
         require(frames.count == count, "Expected \(count) frames, got \(frames.count)")
         for frame in frames {
             require(workspace.contains(frame), "\(frame) is outside \(workspace)")
+            if count == 1 {
+                require(frame == workspace, "A single window must fill the workspace")
+                continue
+            }
             require(
                 frame.width == floor(workspace.width * 0.9),
                 "Frame is not 90% of the workspace width: \(frame)"
@@ -53,9 +57,9 @@ private func testWindowsCascadeFromUpperLeftToLowerRight() {
 }
 
 private func testEveryWindowKeepsTheSameSizeAsCountGrows() {
-    let reference = LayoutPlanner.frames(in: workspace, count: 1)[0].size
+    let reference = LayoutPlanner.frames(in: workspace, count: 2)[0].size
 
-    for count in 2...20 {
+    for count in 3...20 {
         let frames = LayoutPlanner.frames(in: workspace, count: count)
         for frame in frames {
             require(
@@ -64,6 +68,24 @@ private func testEveryWindowKeepsTheSameSizeAsCountGrows() {
             )
         }
     }
+}
+
+private func testAnimationInterpolation() {
+    let start = CGRect(x: 20, y: 40, width: 600, height: 400)
+    let end = CGRect(x: 100, y: 120, width: 1200, height: 800)
+
+    require(
+        FrameInterpolator.easeOut(from: start, to: end, progress: 0) == start,
+        "Animation must begin at the current frame"
+    )
+    require(
+        FrameInterpolator.easeOut(from: start, to: end, progress: 1) == end,
+        "Animation must finish at the exact target frame"
+    )
+
+    let midpoint = FrameInterpolator.easeOut(from: start, to: end, progress: 0.5)
+    require(midpoint.minX > 60 && midpoint.minX < end.minX, "Animation must ease toward its target")
+    require(midpoint.width > 900 && midpoint.width < end.width, "Window size must animate smoothly")
 }
 
 private func testEdgeCases() {
@@ -77,5 +99,6 @@ private func testEdgeCases() {
 testProducesOneFramePerWindowInsideWorkspace()
 testWindowsCascadeFromUpperLeftToLowerRight()
 testEveryWindowKeepsTheSameSizeAsCountGrows()
+testAnimationInterpolation()
 testEdgeCases()
 print("All Kuati layout tests passed")
