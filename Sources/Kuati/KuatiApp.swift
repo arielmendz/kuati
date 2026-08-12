@@ -40,28 +40,16 @@ private struct MenuContent: View {
                 Button {
                     windowManager.arrangeNow()
                 } label: {
-                    Label("Arrange Windows", systemImage: "square.grid.2x2")
+                    Label("Cascade Windows", systemImage: "rectangle.stack")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.borderedProminent)
 
                 Toggle("Arrange automatically", isOn: $windowManager.isAutomatic)
 
-                HStack {
-                    Text("Window gap")
-                    Spacer()
-                    Stepper(
-                        "\(Int(windowManager.gap)) pt",
-                        value: $windowManager.gap,
-                        in: 0...32,
-                        step: 2
-                    )
-                    .labelsHidden()
-                    Text("\(Int(windowManager.gap)) pt")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .frame(width: 38, alignment: .trailing)
-                }
+                Label("Windows use 90% of the workspace", systemImage: "arrow.up.left.and.arrow.down.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
                 Text("Kuati needs Accessibility access to move and resize windows.")
                     .font(.callout)
@@ -86,7 +74,7 @@ private struct MenuContent: View {
                             .applicationName: "Kuati",
                             .applicationVersion: "0.1.0",
                             .credits: NSAttributedString(
-                                string: "A small, automatic workspace tiler for macOS."
+                                string: "A small, automatic cascading window manager for macOS."
                             )
                         ]
                     )

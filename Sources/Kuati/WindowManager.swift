@@ -7,12 +7,6 @@ import KuatiCore
 final class WindowManager: ObservableObject {
     @Published private(set) var hasAccessibilityPermission = false
     @Published private(set) var statusText = "Checking permissions…"
-    @Published var gap: CGFloat = 10 {
-        didSet {
-            UserDefaults.standard.set(Double(gap), forKey: Self.gapDefaultsKey)
-            if isAutomatic { arrangeNow() }
-        }
-    }
     @Published var isAutomatic: Bool = true {
         didSet {
             UserDefaults.standard.set(isAutomatic, forKey: Self.automaticDefaultsKey)
@@ -20,7 +14,6 @@ final class WindowManager: ObservableObject {
         }
     }
 
-    private static let gapDefaultsKey = "windowGap"
     private static let automaticDefaultsKey = "automaticArrangement"
 
     private var timer: Timer?
@@ -28,9 +21,6 @@ final class WindowManager: ObservableObject {
 
     init() {
         let defaults = UserDefaults.standard
-        if defaults.object(forKey: Self.gapDefaultsKey) != nil {
-            gap = CGFloat(defaults.double(forKey: Self.gapDefaultsKey))
-        }
         if defaults.object(forKey: Self.automaticDefaultsKey) != nil {
             isAutomatic = defaults.bool(forKey: Self.automaticDefaultsKey)
         }
@@ -94,11 +84,10 @@ final class WindowManager: ObservableObject {
         for screen in screens {
             let screenWindows = windows
                 .filter { screen.frame.contains($0.frame.center) }
-                .sorted(by: ManagedWindow.stableOrder)
+                .sorted(by: ManagedWindow.cascadeOrder)
             let targetFrames = LayoutPlanner.frames(
                 in: screen.visibleFrame,
-                count: screenWindows.count,
-                gap: gap
+                count: screenWindows.count
             )
 
             for (window, frame) in zip(screenWindows, targetFrames) {
@@ -128,7 +117,7 @@ final class WindowManager: ObservableObject {
 
     private func signature(for windows: [ManagedWindow]) -> String {
         windows
-            .sorted(by: ManagedWindow.stableOrder)
+            .sorted(by: ManagedWindow.cascadeOrder)
             .map { "\($0.pid):\($0.title):\(ScreenGeometry.screenIndex(containing: $0.frame.center))" }
             .joined(separator: "|")
     }
@@ -151,6 +140,7 @@ private struct ManagedWindow {
     let pid: pid_t
     let title: String
     let frame: CGRect
+    let frontToBackIndex: Int
 
     static func windows(
         for pid: pid_t,
@@ -177,20 +167,25 @@ private struct ManagedWindow {
 
             let frame = CGRect(origin: position, size: size)
             let title: String = element.value(for: kAXTitleAttribute) ?? ""
-            guard visibleForApplication.contains(where: { $0.matches(frame: frame, title: title) }) else {
+            guard let snapshot = visibleForApplication.first(where: {
+                $0.matches(frame: frame, title: title)
+            }) else {
                 return nil
             }
 
-            return ManagedWindow(element: element, pid: pid, title: title, frame: frame)
+            return ManagedWindow(
+                element: element,
+                pid: pid,
+                title: title,
+                frame: frame,
+                frontToBackIndex: snapshot.frontToBackIndex
+            )
         }
     }
 
-    static func stableOrder(_ lhs: ManagedWindow, _ rhs: ManagedWindow) -> Bool {
-        if abs(lhs.frame.minY - rhs.frame.minY) > 24 {
-            return lhs.frame.minY < rhs.frame.minY
-        }
-        if abs(lhs.frame.minX - rhs.frame.minX) > 24 {
-            return lhs.frame.minX < rhs.frame.minX
+    static func cascadeOrder(_ lhs: ManagedWindow, _ rhs: ManagedWindow) -> Bool {
+        if lhs.frontToBackIndex != rhs.frontToBackIndex {
+            return lhs.frontToBackIndex < rhs.frontToBackIndex
         }
         if lhs.pid != rhs.pid { return lhs.pid < rhs.pid }
         return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
@@ -209,6 +204,7 @@ private struct OnScreenWindowSnapshot {
     let pid: pid_t
     let title: String
     let frame: CGRect
+    let frontToBackIndex: Int
 
     static func capture() -> [OnScreenWindowSnapshot] {
         guard let rawWindows = CGWindowListCopyWindowInfo(
@@ -216,7 +212,7 @@ private struct OnScreenWindowSnapshot {
             kCGNullWindowID
         ) as? [[String: Any]] else { return [] }
 
-        return rawWindows.compactMap { info in
+        return rawWindows.enumerated().compactMap { index, info in
             guard
                 let layer = info[kCGWindowLayer as String] as? Int,
                 layer == 0,
@@ -231,7 +227,8 @@ private struct OnScreenWindowSnapshot {
             return OnScreenWindowSnapshot(
                 pid: pid_t(pidValue),
                 title: info[kCGWindowName as String] as? String ?? "",
-                frame: CGRect(x: x, y: y, width: width, height: height)
+                frame: CGRect(x: x, y: y, width: width, height: height),
+                frontToBackIndex: index
             )
         }
     }

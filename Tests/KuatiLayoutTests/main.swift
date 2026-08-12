@@ -12,54 +12,70 @@ private func require(
 
 private func testProducesOneFramePerWindowInsideWorkspace() {
     for count in 1...12 {
-        let frames = LayoutPlanner.frames(in: workspace, count: count, gap: 10)
+        let frames = LayoutPlanner.frames(in: workspace, count: count)
 
         require(frames.count == count, "Expected \(count) frames, got \(frames.count)")
         for frame in frames {
             require(workspace.contains(frame), "\(frame) is outside \(workspace)")
-            require(frame.width > 0, "Frame has no width: \(frame)")
-            require(frame.height > 0, "Frame has no height: \(frame)")
-        }
-    }
-}
-
-private func testFramesDoNotOverlap() {
-    let frames = LayoutPlanner.frames(in: workspace, count: 9, gap: 12)
-
-    for firstIndex in frames.indices {
-        for secondIndex in frames.indices where secondIndex > firstIndex {
             require(
-                !frames[firstIndex].intersects(frames[secondIndex]),
-                "Frames overlap: \(frames[firstIndex]) and \(frames[secondIndex])"
+                frame.width == floor(workspace.width * 0.9),
+                "Frame is not 90% of the workspace width: \(frame)"
+            )
+            require(
+                frame.height == floor(workspace.height * 0.9),
+                "Frame is not 90% of the workspace height: \(frame)"
             )
         }
     }
 }
 
-private func testMoreWindowsYieldSmallerAverageFrames() {
-    var previousAverageArea = CGFloat.greatestFiniteMagnitude
+private func testWindowsCascadeFromUpperLeftToLowerRight() {
+    let frames = LayoutPlanner.frames(in: workspace, count: 3)
 
-    for count in 1...10 {
-        let frames = LayoutPlanner.frames(in: workspace, count: count, gap: 8)
-        let averageArea = frames.map { $0.width * $0.height }.reduce(0, +) / CGFloat(count)
-        require(
-            averageArea < previousAverageArea,
-            "Average area did not shrink at \(count) windows"
-        )
-        previousAverageArea = averageArea
+    require(frames[0].origin == workspace.origin, "First window must start at the upper-left")
+    require(
+        frames[2].maxX == workspace.maxX && frames[2].maxY == workspace.maxY,
+        "Last window must reach the lower-right"
+    )
+    require(
+        frames[0].minX < frames[1].minX && frames[1].minX < frames[2].minX,
+        "Windows must cascade horizontally"
+    )
+    require(
+        frames[0].minY < frames[1].minY && frames[1].minY < frames[2].minY,
+        "Windows must cascade vertically"
+    )
+    for firstIndex in frames.indices {
+        for secondIndex in frames.indices where secondIndex > firstIndex {
+            require(frames[firstIndex].intersects(frames[secondIndex]), "Cascade windows must overlap")
+        }
+    }
+}
+
+private func testEveryWindowKeepsTheSameSizeAsCountGrows() {
+    let reference = LayoutPlanner.frames(in: workspace, count: 1)[0].size
+
+    for count in 2...20 {
+        let frames = LayoutPlanner.frames(in: workspace, count: count)
+        for frame in frames {
+            require(
+                frame.size == reference,
+                "Window size changed when the cascade grew to \(count) windows"
+            )
+        }
     }
 }
 
 private func testEdgeCases() {
-    require(LayoutPlanner.frames(in: workspace, count: 0, gap: 10) == [], "Zero count failed")
-
-    let negativeGap = LayoutPlanner.frames(in: workspace, count: 4, gap: -10)
-    let zeroGap = LayoutPlanner.frames(in: workspace, count: 4, gap: 0)
-    require(negativeGap == zeroGap, "A negative gap must be treated as zero")
+    require(LayoutPlanner.frames(in: workspace, count: 0) == [], "Zero count failed")
+    require(
+        LayoutPlanner.frames(in: .zero, count: 3) == [],
+        "An empty workspace must not produce frames"
+    )
 }
 
 testProducesOneFramePerWindowInsideWorkspace()
-testFramesDoNotOverlap()
-testMoreWindowsYieldSmallerAverageFrames()
+testWindowsCascadeFromUpperLeftToLowerRight()
+testEveryWindowKeepsTheSameSizeAsCountGrows()
 testEdgeCases()
 print("All Kuati layout tests passed")

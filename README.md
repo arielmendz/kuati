@@ -1,15 +1,16 @@
 # Kuati
 
 Kuati is a tiny macOS menu-bar window manager. It watches the visible windows in
-your current workspace and lays them out in a balanced grid. As more windows are
-opened, every tile gets smaller automatically.
+your current workspace, sizes each one to 90% of its display's usable maximized
+frame, and distributes them in an overlapping diagonal cascade.
 
 ## First version
 
-- Arranges the visible, movable windows on every display
-- Re-tiles automatically when windows are opened, closed, or moved between displays
+- Cascades the visible, movable windows on every display
+- Keeps every window at 90% of its display's usable maximized size
+- Re-cascades automatically when windows are opened, closed, or moved between displays
 - Keeps the menu bar and Dock clear by using each display's visible workspace
-- Lets you trigger arrangement manually and adjust the gap between windows
+- Lets you trigger the cascade manually
 - Ignores minimized, full-screen, hidden, and non-resizable windows
 - Filters out windows on other macOS Spaces
 
