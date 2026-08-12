@@ -10,49 +10,66 @@ import KuatiCore
 final class WindowManager: ObservableObject {
     @Published private(set) var hasAccessibilityPermission = false
     @Published private(set) var statusText = "Checking permissions…"
-    @Published var isAutomatic: Bool = true {
+    @Published var isAutomatic: Bool = WindowManager.storedAutomaticPreference {
         didSet {
             UserDefaults.standard.set(isAutomatic, forKey: Self.automaticDefaultsKey)
-            if isAutomatic { arrangeNow() }
+            if isAutomatic {
+                arrangeNow()
+            } else {
+                updateStatus(windowCount: nil)
+            }
         }
     }
 
     private static let automaticDefaultsKey = "automaticArrangement"
     private static let animationSteps = 16
     private static let animationFrameNanoseconds: UInt64 = 16_666_667
+    private static let messagingTimeout: Float = 0.5
+    private static let permissionPollInterval: TimeInterval = 1
+    private static let eventSettlingInterval: TimeInterval = 0.15
+    /// Accessibility notification coverage varies between applications, so a
+    /// slow sweep reconciles anything the observers missed. It is a safety net,
+    /// not the mechanism: real changes are handled by notification, in a
+    /// fraction of a second, long before this fires.
+    private static let reconciliationInterval: TimeInterval = 30
 
-    private var timer: Timer?
+    /// Reads the saved preference without routing through `isAutomatic`.
+    /// `@Published` properties run their `didSet` even when assigned inside
+    /// `init`, so restoring the value there would arrange windows — and so
+    /// prompt for Accessibility access — before `refreshPermission()` had run.
+    private static var storedAutomaticPreference: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: automaticDefaultsKey) != nil else { return true }
+        return defaults.bool(forKey: automaticDefaultsKey)
+    }
+
+    private var permissionTimer: Timer?
+    private var reconciliationTimer: Timer?
+    private var settlingTimer: Timer?
     private var animationTask: Task<Void, Never>?
+    private var notificationObservers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    private var applicationObservers: [pid_t: ApplicationObserver] = [:]
     private var previousWindowSignature = ""
 
     init() {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: Self.automaticDefaultsKey) != nil {
-            isAutomatic = defaults.bool(forKey: Self.automaticDefaultsKey)
-        }
-
+        // Bound how long an unresponsive application can block the main thread
+        // inside a synchronous accessibility call. Applying this to the
+        // system-wide element sets the default for every element this process
+        // creates, so a hung application costs a fraction of a second instead
+        // of stalling the menu bar.
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), Self.messagingTimeout)
         refreshPermission()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.pollWorkspace()
-            }
-        }
     }
 
     func requestAccessibilityPermission() {
         let options = [
             kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
         ] as CFDictionary
-        hasAccessibilityPermission = AXIsProcessTrustedWithOptions(options)
-        updateStatus(windowCount: nil)
+        apply(permission: AXIsProcessTrustedWithOptions(options))
     }
 
     func refreshPermission() {
-        hasAccessibilityPermission = AXIsProcessTrusted()
-        updateStatus(windowCount: nil)
-        if hasAccessibilityPermission, isAutomatic {
-            arrangeNow()
-        }
+        apply(permission: AXIsProcessTrusted())
     }
 
     func arrangeNow() {
@@ -62,20 +79,183 @@ final class WindowManager: ObservableObject {
         }
 
         let windows = currentWorkspaceWindows()
+        observe(windows)
         arrange(windows)
         previousWindowSignature = signature(for: windows)
         updateStatus(windowCount: windows.count)
     }
 
-    private func pollWorkspace() {
-        let permission = AXIsProcessTrusted()
-        if permission != hasAccessibilityPermission {
-            hasAccessibilityPermission = permission
+    // MARK: - Accessibility permission
+
+    private func apply(permission granted: Bool) {
+        hasAccessibilityPermission = granted
+
+        guard granted else {
+            stopObserving()
+            startPermissionPolling()
             updateStatus(windowCount: nil)
+            return
         }
 
-        guard permission, isAutomatic else { return }
+        stopPermissionPolling()
+        startObservingWorkspace()
+        startReconciling()
+        refreshApplicationObservers()
+
+        if isAutomatic {
+            arrangeNow()
+        } else {
+            updateStatus(windowCount: nil)
+        }
+    }
+
+    /// Accessibility trust has no change notification, so it is polled — but
+    /// only while the grant is still missing. Once it arrives the timer stops
+    /// and the app is entirely event driven.
+    private func startPermissionPolling() {
+        guard permissionTimer == nil else { return }
+        let timer = Timer(timeInterval: Self.permissionPollInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, !self.hasAccessibilityPermission, AXIsProcessTrusted() else { return }
+                self.apply(permission: true)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        permissionTimer = timer
+    }
+
+    private func stopPermissionPolling() {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
+    }
+
+    // MARK: - Change notifications
+
+    private func startObservingWorkspace() {
+        guard notificationObservers.isEmpty else { return }
+
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        let workspaceNotifications: [Notification.Name] = [
+            NSWorkspace.didLaunchApplicationNotification,
+            NSWorkspace.didTerminateApplicationNotification,
+            NSWorkspace.didActivateApplicationNotification,
+            NSWorkspace.didHideApplicationNotification,
+            NSWorkspace.didUnhideApplicationNotification,
+            NSWorkspace.activeSpaceDidChangeNotification
+        ]
+
+        for name in workspaceNotifications {
+            let token = workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.handleWorkspaceChange() }
+            }
+            notificationObservers.append((workspaceCenter, token))
+        }
+
+        let screenToken = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleScreenChange() }
+        }
+        notificationObservers.append((NotificationCenter.default, screenToken))
+    }
+
+    private func startReconciling() {
+        guard reconciliationTimer == nil else { return }
+        let timer = Timer(timeInterval: Self.reconciliationInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.scheduleLayoutCheck() }
+        }
+        timer.tolerance = Self.reconciliationInterval / 2
+        RunLoop.main.add(timer, forMode: .common)
+        reconciliationTimer = timer
+    }
+
+    private func stopObserving() {
+        settlingTimer?.invalidate()
+        settlingTimer = nil
+        reconciliationTimer?.invalidate()
+        reconciliationTimer = nil
+        applicationObservers.removeAll()
+
+        for observer in notificationObservers {
+            observer.center.removeObserver(observer.token)
+        }
+        notificationObservers.removeAll()
+    }
+
+    /// Keeps one accessibility observer per managed application, adding
+    /// observers for applications that launched and dropping those that quit.
+    private func refreshApplicationObservers() {
+        guard hasAccessibilityPermission else { return }
+
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let livePIDs = Set(
+            NSWorkspace.shared.runningApplications
+                .filter {
+                    $0.processIdentifier != ownPID &&
+                        $0.activationPolicy == .regular &&
+                        !$0.isTerminated
+                }
+                .map(\.processIdentifier)
+        )
+
+        applicationObservers = applicationObservers.filter { livePIDs.contains($0.key) }
+        for pid in livePIDs where applicationObservers[pid] == nil {
+            applicationObservers[pid] = ApplicationObserver(pid: pid) { [weak self] in
+                Task { @MainActor in self?.scheduleLayoutCheck() }
+            }
+        }
+    }
+
+    /// Window move and resize notifications are posted by the window elements
+    /// themselves, so the observed set follows the windows Kuati manages.
+    private func observe(_ windows: [ManagedWindow]) {
+        let windowsByApplication = Dictionary(grouping: windows, by: \.pid)
+        for (pid, observer) in applicationObservers {
+            observer.observe(windows: windowsByApplication[pid]?.map(\.element) ?? [])
+        }
+    }
+
+    private func handleWorkspaceChange() {
+        guard hasAccessibilityPermission else { return }
+        refreshApplicationObservers()
+        scheduleLayoutCheck()
+    }
+
+    private func handleScreenChange() {
+        guard hasAccessibilityPermission else { return }
+        // A display change alters every usable frame, so the layout has to be
+        // recomputed even when the same windows are on the same screens.
+        previousWindowSignature = ""
+        scheduleLayoutCheck()
+    }
+
+    /// Coalesces bursts of accessibility notifications — a window drag emits a
+    /// steady stream of them — into a single layout check.
+    private func scheduleLayoutCheck() {
+        guard isAutomatic, animationTask == nil else { return }
+
+        settlingTimer?.invalidate()
+        let timer = Timer(timeInterval: Self.eventSettlingInterval, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.applyLayoutIfChanged() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        settlingTimer = timer
+    }
+
+    private func applyLayoutIfChanged() {
+        settlingTimer?.invalidate()
+        settlingTimer = nil
+        guard isAutomatic else { return }
+        guard AXIsProcessTrusted() else {
+            apply(permission: false)
+            return
+        }
+
         let windows = currentWorkspaceWindows()
+        observe(windows)
+
         let newSignature = signature(for: windows)
         guard newSignature != previousWindowSignature else { return }
 
@@ -83,6 +263,8 @@ final class WindowManager: ObservableObject {
         previousWindowSignature = newSignature
         updateStatus(windowCount: windows.count)
     }
+
+    // MARK: - Layout
 
     private func arrange(_ windows: [ManagedWindow]) {
         let screens = ScreenGeometry.currentScreens()
@@ -133,6 +315,9 @@ final class WindowManager: ObservableObject {
             }
 
             self?.animationTask = nil
+            // Layout checks are suppressed while animating, so pick up anything
+            // that changed during the transition.
+            self?.scheduleLayoutCheck()
         }
     }
 
@@ -178,6 +363,115 @@ final class WindowManager: ObservableObject {
 private struct ManagedWindowTransition {
     let window: ManagedWindow
     let targetFrame: CGRect
+}
+
+/// Watches one application for the accessibility notifications that change how
+/// its windows should be laid out. Notifications arrive on the main run loop,
+/// which is where `onChange` is invoked.
+private final class ApplicationObserver {
+    private static let applicationNotifications = [
+        kAXWindowCreatedNotification,
+        kAXFocusedWindowChangedNotification,
+        kAXMainWindowChangedNotification,
+        kAXWindowMiniaturizedNotification,
+        kAXWindowDeminiaturizedNotification,
+        kAXApplicationHiddenNotification,
+        kAXApplicationShownNotification
+    ]
+
+    /// Miniaturize notifications are posted by the window element in some
+    /// applications and by the application element in others, so both are
+    /// registered. Duplicate deliveries coalesce into one layout check.
+    private static let windowNotifications = [
+        kAXUIElementDestroyedNotification,
+        kAXWindowMovedNotification,
+        kAXWindowResizedNotification,
+        kAXWindowMiniaturizedNotification,
+        kAXWindowDeminiaturizedNotification
+    ]
+
+    private let observer: AXObserver
+    private let applicationElement: AXUIElement
+    private let onChange: () -> Void
+    private var observedWindows: [AXUIElement] = []
+
+    init?(pid: pid_t, onChange: @escaping () -> Void) {
+        var createdObserver: AXObserver?
+        guard
+            AXObserverCreate(pid, applicationObserverCallback, &createdObserver) == .success,
+            let createdObserver
+        else { return nil }
+
+        self.observer = createdObserver
+        self.applicationElement = AXUIElementCreateApplication(pid)
+        self.onChange = onChange
+
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        for notification in Self.applicationNotifications {
+            AXObserverAddNotification(observer, applicationElement, notification as CFString, context)
+        }
+
+        // Common modes keep notifications flowing while a menu is tracking.
+        CFRunLoopAddSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .commonModes
+        )
+    }
+
+    deinit {
+        removeWindowNotifications()
+        for notification in Self.applicationNotifications {
+            AXObserverRemoveNotification(observer, applicationElement, notification as CFString)
+        }
+        CFRunLoopRemoveSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .commonModes
+        )
+    }
+
+    func observe(windows: [AXUIElement]) {
+        guard !isObserving(windows) else { return }
+
+        removeWindowNotifications()
+        observedWindows = windows
+
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        for window in windows {
+            for notification in Self.windowNotifications {
+                AXObserverAddNotification(observer, window, notification as CFString, context)
+            }
+        }
+    }
+
+    fileprivate func notifyChange() {
+        onChange()
+    }
+
+    private func isObserving(_ windows: [AXUIElement]) -> Bool {
+        windows.count == observedWindows.count &&
+            zip(observedWindows, windows).allSatisfy { CFEqual($0, $1) }
+    }
+
+    private func removeWindowNotifications() {
+        for window in observedWindows {
+            for notification in Self.windowNotifications {
+                AXObserverRemoveNotification(observer, window, notification as CFString)
+            }
+        }
+        observedWindows = []
+    }
+}
+
+private func applicationObserverCallback(
+    _ observer: AXObserver,
+    _ element: AXUIElement,
+    _ notification: CFString,
+    _ context: UnsafeMutableRawPointer?
+) {
+    guard let context else { return }
+    Unmanaged<ApplicationObserver>.fromOpaque(context).takeUnretainedValue().notifyChange()
 }
 
 private struct ManagedWindow {
