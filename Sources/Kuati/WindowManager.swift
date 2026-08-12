@@ -288,8 +288,11 @@ final class WindowManager: ObservableObject {
     }
 
     private func animate(_ transitions: [ManagedWindowTransition]) {
-        animationTask?.cancel()
+        // Check for an empty arrangement before cancelling. Cancelling first
+        // would abandon a running transition part way through, freezing those
+        // windows between their old and new frames.
         guard !transitions.isEmpty else { return }
+        animationTask?.cancel()
 
         animationTask = Task { @MainActor [weak self] in
             for step in 1...Self.animationSteps {
