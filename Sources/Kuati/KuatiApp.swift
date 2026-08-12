@@ -43,13 +43,24 @@ struct KuatiApp: App {
             }
             .keyboardShortcut("q")
         } label: {
-            Image(nsImage: NSApplication.shared.applicationIconImage)
-                .resizable()
-                .renderingMode(.original)
-                .scaledToFit()
-                .frame(width: 18, height: 18)
+            Image(nsImage: MenuBarIcon.image)
                 .accessibilityLabel("Kuati")
         }
         .menuBarExtraStyle(.menu)
     }
+}
+
+private enum MenuBarIcon {
+    /// A template image lets macOS apply the correct monochrome menu-bar tint
+    /// for light mode, dark mode, selection, and increased contrast.
+    static let image: NSImage = {
+        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { _ in
+            NSColor.black.setFill()
+            NSBezierPath(rect: NSRect(x: 2, y: 6, width: 9, height: 8)).fill()
+            NSBezierPath(rect: NSRect(x: 5, y: 2, width: 9, height: 8)).fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 }
