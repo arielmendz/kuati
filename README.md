@@ -24,6 +24,27 @@ multiple windows in an overlapping diagonal cascade at 90% of maximized size.
 - Swift 5.10 or newer (Xcode Command Line Tools is sufficient)
 - Accessibility permission, requested on first launch
 
+## Install with Homebrew
+
+Kuati is distributed as a Homebrew Cask from this repository:
+
+```sh
+brew tap arielmendz/kuati https://github.com/arielmendz/kuati.git
+brew install --cask arielmendz/kuati/kuati
+open /Applications/Kuati.app
+```
+
+After opening Kuati, grant it access in **System Settings → Privacy & Security →
+Accessibility**. Releases are currently ad-hoc signed, so macOS may require
+Accessibility access to be enabled again after an upgrade.
+
+Upgrade or uninstall with:
+
+```sh
+brew upgrade --cask kuati
+brew uninstall --cask kuati
+```
+
 ## Build and run
 
 ```sh
@@ -53,3 +74,16 @@ This repository uses Swift Package Manager and has no third-party dependencies:
 swift build
 make test
 ```
+
+## Release
+
+Releases are built as universal Apple Silicon and Intel applications. Update the
+version in `support/Info.plist`, commit it, and push a matching tag:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow tests the project, publishes `Kuati-<version>.zip`, and
+updates the version and SHA-256 in `Casks/kuati.rb`.

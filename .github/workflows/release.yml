@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate the version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must use semantic versioning, for example v0.1.0" >&2
+            exit 1
+          fi
+          plist_version=$(plutil -extract CFBundleShortVersionString raw support/Info.plist)
+          if [[ "$version" != "$plist_version" ]]; then
+            echo "Tag version $version does not match Info.plist version $plist_version" >&2
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run layout tests
+        run: swift run KuatiLayoutTests
+
+      - name: Build the universal application archive
+        run: ./scripts/build-release.sh "${{ steps.version.outputs.value }}"
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="dist/Kuati-${{ steps.version.outputs.value }}.zip"
+          gh release create "$GITHUB_REF_NAME" \
+            "$archive#Kuati ${{ steps.version.outputs.value }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Kuati ${{ steps.version.outputs.value }}" \
+            --generate-notes \
+            --verify-tag
+
+      - name: Update the Homebrew Cask checksum
+        shell: bash
+        run: |
+          archive="dist/Kuati-${{ steps.version.outputs.value }}.zip"
+          checksum=$(shasum -a 256 "$archive" | awk '{print $1}')
+          git checkout -B main origin/main
+          ./scripts/update-cask.sh "${{ steps.version.outputs.value }}" "$checksum"
+
+          if git diff --quiet -- Casks/kuati.rb; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/kuati.rb
+          git commit -m "Update Homebrew Cask for $GITHUB_REF_NAME"
+          git push origin main
