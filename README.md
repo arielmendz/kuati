@@ -1,42 +1,74 @@
 # Kuati
 
 Kuati is a tiny macOS menu-bar window manager. It watches the visible windows in
-your current workspace, maximizes a window when it is alone, and distributes
+your current workspace, maximizes the lone window on a display, and distributes
 multiple windows in an overlapping diagonal cascade. Two windows use 95% of
 their maximized size; three or more use 90%.
 
-## First version
-
-- Uses a compact native macOS menu with standard clickable items
-- Includes a custom two-window Kuati application icon
-- Cascades the visible, movable windows on every display
-- Maximizes a window when it is the only one in its workspace
-- Keeps two windows at 95% and three or more at 90% of maximized size
-- Animates window movement and resizing with a short eased transition
-- Re-cascades automatically when windows are opened, closed, or moved between displays
-- Can launch automatically when you log in to macOS
-- Keeps the menu bar and Dock clear by using each display's visible workspace
-- Lets you trigger the cascade manually
-- Ignores minimized, full-screen, hidden, and non-resizable windows
-- Filters out windows on other macOS Spaces
-
-## Requirements
-
-- macOS 13 or newer
-- Swift 5.10 or newer (Xcode Command Line Tools is sufficient)
-- Accessibility permission, requested on first launch
-
-## Install with Homebrew
-
-Kuati is distributed from this repository as a Homebrew Cask.
+## Quickstart
 
 ### Standard installation
+
+Kuati requires macOS 13 or newer and [Homebrew](https://brew.sh/). Install and
+open the latest release with:
 
 ```sh
 brew tap arielmendz/kuati https://github.com/arielmendz/kuati.git
 brew install --cask arielmendz/kuati/kuati
 open /Applications/Kuati.app
 ```
+
+Kuati runs only in the menu bar. Select its two-window icon, then complete the
+one-time setup:
+
+1. Select **Grant Accessibility Access**.
+2. In **System Settings → Privacy & Security → Accessibility**, enable Kuati.
+3. Return to Kuati and select **Check Accessibility Access**.
+
+Kuati starts arranging windows automatically as soon as access is granted. Use
+**Arrange Automatically** to pause or resume watching, **Cascade Windows** to
+arrange on demand, and **Start at Login** if you want Kuati to launch with macOS.
+
+> [!IMPORTANT]
+> Current releases are ad-hoc signed and are not notarized by Apple, so
+> Gatekeeper may block the first launch. Do not disable Gatekeeper globally.
+> See [First launch](#first-launch) for details.
+
+## Features
+
+- Uses a compact native macOS menu with standard clickable items
+- Includes a custom two-window Kuati application icon
+- Arranges the visible, movable windows in the current macOS Space,
+  independently on each display
+- Maximizes a window when it is the only managed window on its display
+- Keeps two windows at 95% and three or more at 90% of maximized size
+- Animates window movement and resizing with a short eased transition
+- Arranges automatically by default and remembers when automatic arrangement
+  is paused
+- Responds to windows opening, closing, minimizing, being restored, or moving
+  between displays
+- Recalculates layouts when apps are hidden, Spaces change, or displays are
+  reconfigured
+- Uses accessibility and workspace notifications for fast updates, with a
+  periodic reconciliation for missed events
+- Can launch automatically when you log in to macOS
+- Keeps windows clear of the menu bar and Dock by using each display's visible
+  workspace
+- Lets you trigger an arrangement manually from the menu bar
+- Ignores minimized, full-screen, hidden, and non-resizable windows
+- Ignores windows on other macOS Spaces
+
+## Requirements
+
+- macOS 13 Ventura or newer
+- Accessibility permission for arranging windows
+- Homebrew for the standard installation, or Swift 5.10 or newer to build from
+  source
+
+## Installation details
+
+Kuati is distributed from this repository as a Homebrew Cask. The
+[standard installation](#standard-installation) places it in `/Applications`.
 
 ### Installation without administrator access
 
@@ -105,6 +137,9 @@ brew uninstall --cask --zap kuati
 
 ## Build and run
 
+Building from source requires Swift 5.10 or newer. Xcode Command Line Tools is
+sufficient; the project has no third-party dependencies.
+
 ```sh
 make test
 make app
@@ -113,7 +148,7 @@ open build/Kuati.app
 
 Kuati appears in the menu bar. On first launch, select **Grant Accessibility
 Access**, enable Kuati in **System Settings → Privacy & Security → Accessibility**,
-then return to Kuati and select **Check Again**.
+then return to Kuati and select **Check Accessibility Access**.
 
 Select **Start at Login** in the Kuati menu to have macOS launch the app on
 subsequent logins. If macOS requires approval, Kuati opens **System Settings →
@@ -136,7 +171,7 @@ that step with Developer ID signing and notarization.
 
 ## Development
 
-This repository uses Swift Package Manager and has no third-party dependencies:
+This repository uses Swift Package Manager:
 
 ```sh
 swift build
@@ -149,8 +184,9 @@ Releases are built as universal Apple Silicon and Intel applications. Update the
 version in `support/Info.plist`, commit it, and push a matching tag:
 
 ```sh
-git tag v0.1.3
-git push origin v0.1.3
+VERSION=0.1.6
+git tag "v${VERSION}"
+git push origin "v${VERSION}"
 ```
 
 The release workflow tests the project, publishes `Kuati-<version>.zip`, and
